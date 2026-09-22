@@ -62,9 +62,18 @@ $("system-form").addEventListener('submit', async event => {
     if (!response.ok) throw new Error(data.error || 'Ошибка расчёта');
     systemResult = data;
     $("sheffer-gates").replaceChildren(); $("sheffer-outputs").replaceChildren();
-    for (const [target, items] of [['sheffer-gates',data.sheffer.gates],['sheffer-outputs',data.sheffer.outputs]]) {
-      for (const item of items) {const p=document.createElement('p'); p.textContent=`${item.name} = ${item.expression}`; $(target).append(p);}
+    for (const item of data.sheffer.gates) {
+      const p = document.createElement('p'); p.textContent = `${item.name} = ${item.expression}`; $('sheffer-gates').append(p);
     }
+    for (const item of data.sheffer.outputs) {
+      const p = document.createElement('p');
+      p.append(document.createTextNode(`${item.name} = `));
+      const formula = document.createElement('span');
+      // Formula markup is generated from validated variable names and escaped on the server.
+      formula.innerHTML = item.formula_html; p.append(formula); $('sheffer-outputs').append(p);
+    }
+    $('sheffer-diagram').innerHTML = data.sheffer.svg;
+    $('sheffer-zoom').value = '100'; resizeCircuit();
     $("sheffer-status").textContent = '';
     $("system-cost").textContent = `Букв в общей совокупности: ${data.literal_count}. Общих термов: ${data.term_count}. Минимум найден точным методом меток.`;
     $("system-formulas").replaceChildren();
@@ -78,6 +87,36 @@ $("system-form").addEventListener('submit', async event => {
   } catch (error) {
     if (id === systemRequest) {$("system-error").textContent = error.message; $("system-error").hidden = false;}
   } finally {$("system-submit").disabled = false;}
+});
+
+function resizeCircuit() {
+  const svg = $('sheffer-diagram').querySelector('svg');
+  const scale = Number($('sheffer-zoom').value) / 100;
+  $('sheffer-zoom-value').textContent = `${Math.round(scale * 100)}%`;
+  if (svg) {svg.style.width = `${svg.viewBox.baseVal.width * scale}px`; svg.style.height = 'auto';}
+}
+$('sheffer-zoom').addEventListener('input', resizeCircuit);
+$('sheffer-svg').addEventListener('click', () => {
+  if (systemResult) download(new Blob([systemResult.sheffer.svg], {type:'image/svg+xml;charset=utf-8'}), 'sheffer-system.svg');
+});
+$('sheffer-png').addEventListener('click', async () => {
+  if (!systemResult) return;
+  const button = $('sheffer-png'); button.disabled = true;
+  const url = URL.createObjectURL(new Blob([systemResult.sheffer.svg], {type:'image/svg+xml;charset=utf-8'}));
+  try {
+    const img = new Image(); img.src = url; await img.decode();
+    const canvas = document.createElement('canvas');
+    // Keep the complete diagram within browser canvas limits, including large systems.
+    const scale = Math.min(2, 8192 / Math.max(img.naturalWidth, img.naturalHeight),
+      Math.sqrt(16000000 / (img.naturalWidth * img.naturalHeight)));
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('Не удалось сохранить PNG схемы.');
+    download(blob, 'sheffer-system.png'); $('sheffer-status').textContent = 'PNG схемы подготовлен.';
+  } catch (error) { $('sheffer-status').textContent = error.message; }
+  finally {URL.revokeObjectURL(url); button.disabled = false;}
 });
 $("copy-matrix").addEventListener('click', async () => {
   if (!systemResult) return;

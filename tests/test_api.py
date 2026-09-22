@@ -56,4 +56,7 @@ class ApiTests(unittest.TestCase):
         result = json.loads(body)
         self.assertEqual(result['literal_count'],13)
         self.assertIn('<table',result['matrix_html'])
+        self.assertIn('<svg', result['sheffer']['svg'])
+        self.assertTrue(all(len(g['inputs']) >= 2 for g in result['sheffer']['gates']))
+        self.assertTrue(all('formula' in o and 'formula_html' in o for o in result['sheffer']['outputs']))
         self.assertEqual(self.request('POST','/api/system',json.dumps({'variables':2,'functions':['4','']}))[0],400)

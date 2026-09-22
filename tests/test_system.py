@@ -11,7 +11,7 @@ class SystemTests(unittest.TestCase):
         for assignment in range(1 << len(result['variables'])):
             signals = {name:bool(assignment >> (len(result['variables'])-i-1) & 1) for i,name in enumerate(result['variables'])}
             for gate in circuit['gates']:
-                signals[gate['name']] = not (signals[gate['left']] and signals[gate['right']])
+                signals[gate['name']] = not all(signals[name] for name in gate['inputs'])
             for i,output in enumerate(circuit['outputs']):
                 self.assertEqual(signals[output['expression']],assignment in functions[i])
         for i, output in enumerate(result['outputs']):

@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Вейч · Минимизация булевых функций</title>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/system.js" defer></script>
 </head>
 <body>
-  <header><a href="/" class="brand"><span class="mark">V</span> Вейч<span class="brand-sub">ЛАБОРАТОРИЯ ЛОГИКИ</span></a><span class="local">● Работает локально</span></header>
+  <header><a href="/" class="brand"><span class="mark">V</span> Вейч<span class="brand-sub">ЛАБОРАТОРИЯ ЛОГИКИ</span></a><div class="header-actions"><span class="local">● Работает локально</span><button id="theme-toggle" type="button" aria-pressed="false"><span aria-hidden="true">◐</span> Тёмная тема</button></div></header>
   <main>
     <div class="intro"><div class="eyebrow">ОТ ФУНКЦИИ К ПРОСТОЙ ФОРМУЛЕ</div><h1>Меньше термов.<br><span>Та же логика.</span></h1><p>Введите булеву функцию — получите диаграмму Вейча<br class="desktop"> с выделенными группами и минимальную ДНФ.</p></div>
     <nav class="mode-switch" aria-label="Режим минимизации"><button id="single-tab" aria-pressed="true">Одна функция</button><button id="system-tab" aria-pressed="false">Система функций</button></nav>
@@ -65,7 +66,15 @@
         </section>
         <section class="system-block"><h2>Диаграммы итоговых функций</h2><div id="system-output-maps" class="map-grid"></div></section>
         <section class="system-block"><h2>Все простые импликанты функций и их произведений</h2><p class="system-hint">Сокращённые ДНФ: все простые импликанты, включая не вошедшие в итоговую систему.</p><div id="system-product-maps" class="map-grid"></div></section>
-        <section class="card system-block"><h2>Итоговая система в базисе штриха Шеффера</h2><p class="system-hint">X ↑ Y = ¬(X · Y). Все элементы двухвходовые. T — общие промежуточные сигналы; ниже записаны выходы системы.</p><div id="sheffer-gates"></div><div id="sheffer-outputs" class="equation-system"></div><button id="copy-sheffer">Скопировать систему</button><p id="sheffer-status" role="status"></p></section>
+        <section class="card system-block" id="sheffer-section"><h2>Итоговая система в базисе штриха Шеффера</h2>
+          <p class="system-hint">Каждая группа (X ↑ Y ↑ Z) означает один многовходовый И-НЕ: NAND(X, Y, Z) = ¬(X · Y · Z), а не последовательность двухвходовых операций. Надчёркивание — инверсия, реализованная И-НЕ с объединёнными входами.</p>
+          <div id="sheffer-outputs" class="equation-system"></div><button id="copy-sheffer">Скопировать полные формулы</button><p id="sheffer-status" role="status"></p>
+          <details><summary>Промежуточные сигналы схемы</summary><div id="sheffer-gates"></div></details>
+          <h3>Общая схема системы</h3>
+          <div class="system-actions"><button id="sheffer-svg">↓ SVG схемы</button><button id="sheffer-png">↓ PNG схемы</button></div>
+          <label for="sheffer-zoom">Масштаб схемы: <output id="sheffer-zoom-value">100%</output></label><input id="sheffer-zoom" type="range" min="25" max="150" step="25" value="100">
+          <div id="sheffer-diagram" tabindex="0" aria-label="Схема системы на элементах И-НЕ"></div>
+        </section>
       </div>
     </section>
     <footer>Текстовый ввод · 0–4 переменные · Собственная модель, обученная с нуля</footer>

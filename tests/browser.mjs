@@ -123,7 +123,26 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('#sheffer-outputs p').length`),3);
   await evaluate(`document.getElementById('copy-sheffer').click()`);
   await waitFor(`document.getElementById('sheffer-status').textContent.includes('скопирована')`);
-  assert.match(await evaluate(`navigator.clipboard.readText()`), /↑/);
+  const fullFormulas = await evaluate(`navigator.clipboard.readText()`);
+  assert.match(fullFormulas, /NAND\(/);
+  assert.doesNotMatch(fullFormulas, /\bT\d+\b/);
+  assert.doesNotMatch(await evaluate(`document.getElementById('sheffer-outputs').textContent`), /\bT\d+\b/);
+  assert.equal(await evaluate(`document.querySelectorAll('#sheffer-diagram [data-output]').length`), 3);
+  assert.equal(await evaluate(`document.querySelectorAll('#sheffer-diagram [data-gate]').length === systemResult.sheffer.gates.length`), true);
+  assert.equal(await evaluate(`document.documentElement.scrollWidth <= window.innerWidth`), true);
+  await evaluate(`document.getElementById('sheffer-zoom').value='50'; document.getElementById('sheffer-zoom').dispatchEvent(new Event('input'))`);
+  assert.equal(await evaluate(`document.querySelector('#sheffer-diagram svg').style.width === (document.querySelector('#sheffer-diagram svg').viewBox.baseVal.width / 2) + 'px'`), true);
+  await evaluate(`document.getElementById('sheffer-svg').click(); document.getElementById('sheffer-png').click()`);
+  for (let i=0; i<100; i++) {
+    const files = await readdir(downloads);
+    if (files.includes('sheffer-system.svg') && files.includes('sheffer-system.png')) break;
+    await sleep(100);
+  }
+  assert.match(await readFile(join(downloads, 'sheffer-system.svg'), 'utf8'), /data-output="F3"/);
+  const circuitPng = await readFile(join(downloads, 'sheffer-system.png'));
+  assert.equal(circuitPng.subarray(1,4).toString(), 'PNG');
+  await writeFile(join(artifacts, 'sheffer-system.png'), circuitPng);
+  await writeFile(join(artifacts, 'sheffer-system.svg'), await readFile(join(downloads, 'sheffer-system.svg')));
   await evaluate(`document.getElementById('download-matrix').click()`);
   for (let i=0; i<100; i++) {
     if ((await readdir(downloads)).includes('implicant-matrix.html')) break;
@@ -133,12 +152,25 @@ try {
   await call('Emulation.setDeviceMetricsOverride', {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   shot = await call('Page.captureScreenshot', {format:'png', captureBeyondViewport:false});
   await writeFile(join(artifacts, 'browser-system.png'), Buffer.from(shot.data, 'base64'));
-  for (const [id,file] of [['system-matrix','browser-matrix.png'],['system-output-maps','browser-maps.png'],['sheffer-gates','browser-sheffer.png']]) {
+  for (const [id,file] of [['system-matrix','browser-matrix.png'],['system-output-maps','browser-maps.png'],['sheffer-section','browser-sheffer.png']]) {
     await evaluate(`document.getElementById('${id}').scrollIntoView()`);
     shot = await call('Page.captureScreenshot', {format:'png', captureBeyondViewport:false});
     await writeFile(join(artifacts,file),Buffer.from(shot.data,'base64'));
   }
 
+  await evaluate(`document.getElementById('variable-count').value='3';
+    [...document.querySelectorAll('#system-inputs input')].forEach((input,i) => {input.value=['2','','0,1,2,3,4,5,6,7'][i]; input.dispatchEvent(new Event('input'));});
+    document.getElementById('system-form').requestSubmit()`);
+  await waitFor(`!document.getElementById('system-result').hidden`);
+  assert.equal(await evaluate(`(() => {const inner=document.querySelector('#sheffer-outputs .sheffer-not .sheffer-not'); return inner && inner.getBoundingClientRect().top > inner.parentElement.getBoundingClientRect().top;})()`), true);
+  assert.equal(await evaluate(`document.querySelectorAll('#sheffer-diagram [data-output]').length`), 3);
+  await evaluate(`document.getElementById('variable-count').value='2';
+    [...document.querySelectorAll('#system-inputs input')].forEach(input => {input.value='2,3'; input.dispatchEvent(new Event('input'));});
+    document.getElementById('system-form').requestSubmit()`);
+  await waitFor(`!document.getElementById('system-result').hidden`);
+  assert.equal(await evaluate(`document.querySelectorAll('#sheffer-diagram [data-gate]').length`), 0);
+  assert.equal(await evaluate(`document.querySelectorAll('#sheffer-diagram [data-output]').length`), 3);
+  assert.equal(await evaluate(`document.querySelector('#sheffer-diagram svg').viewBox.baseVal.width >= 700`), true);
   await evaluate(`document.querySelector('#system-inputs input').value='16'; document.querySelector('#system-inputs input').dispatchEvent(new Event('input')); document.getElementById('system-form').requestSubmit()`);
   await waitFor(`!document.getElementById('system-error').hidden`);
   assert.equal(await evaluate(`document.getElementById('system-result').hidden`), true);
