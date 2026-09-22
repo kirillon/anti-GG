@@ -93,7 +93,7 @@ def matrix_export(columns, rows, covered, variables):
 
 def solve_system(n, sources):
     functions = parse_sets(n, sources)
-    variables = list('ABCD'[:n])
+    variables = [f'X{i}' for i in range(n - 1, -1, -1)]
     products, unique = [], {}
     for size in range(1, len(functions) + 1):
         for subset in combinations(range(len(functions)), size):

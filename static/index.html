@@ -49,7 +49,7 @@
         <form id="system-form">
           <label for="variable-count">Количество логических переменных</label>
           <select id="variable-count"><option>1</option><option>2</option><option>3</option><option selected>4</option></select>
-          <p class="system-hint">Переменные A, B, C, D; A — старший бит. Введите номера единичных наборов через запятую: 0, 2, 4. Пустая строка — нулевая функция. От 2 до 4 функций.</p>
+          <p class="system-hint">Для 4 переменных: X3, X2, X1, X0; X3 — старший бит. Для меньшего числа переменных индексы идут от n−1 до 0. Введите номера единичных наборов через запятую: 0, 2, 4. Пустая строка — нулевая функция. От 2 до 4 функций.</p>
           <div id="system-inputs"></div>
           <div class="system-actions"><button type="button" id="add-function">+ Добавить функцию</button><button type="submit" class="primary" id="system-submit">Минимизировать систему</button></div>
         </form>
