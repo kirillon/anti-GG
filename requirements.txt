@@ -1,0 +1,3 @@
+torch>=2.6,<3
+# PyTorch initializes its NumPy interoperability layer on import.
+numpy>=2.0,<3

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Вейч · Минимизация булевых функций</title>
+  <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/system.js" defer></script>
+</head>
+<body>
+  <header><a href="/" class="brand"><span class="mark">V</span> Вейч<span class="brand-sub">ЛАБОРАТОРИЯ ЛОГИКИ</span></a><span class="local">● Работает локально</span></header>
+  <main>
+    <div class="intro"><div class="eyebrow">ОТ ФУНКЦИИ К ПРОСТОЙ ФОРМУЛЕ</div><h1>Меньше термов.<br><span>Та же логика.</span></h1><p>Введите булеву функцию — получите диаграмму Вейча<br class="desktop"> с выделенными группами и минимальную ДНФ.</p></div>
+    <nav class="mode-switch" aria-label="Режим минимизации"><button id="single-tab" aria-pressed="true">Одна функция</button><button id="system-tab" aria-pressed="false">Система функций</button></nav>
+    <div class="workspace" id="single-section">
+      <section class="card input-card" aria-labelledby="input-title">
+        <div class="section-label">01 / ИСХОДНАЯ ФУНКЦИЯ</div>
+        <h2 id="input-title">Что минимизируем?</h2>
+        <form id="form">
+          <label for="function">Булево выражение · до 4 переменных</label>
+          <textarea id="function" name="function" rows="4" maxlength="512" required spellcheck="false">F(A,B,C,D) = !C*!D</textarea>
+          <div class="operators" aria-label="Вставить оператор">
+            <button type="button" data-insert="!" title="НЕ">! <span>НЕ</span></button><button type="button" data-insert="*" title="И">* <span>И</span></button><button type="button" data-insert="+" title="ИЛИ">+ <span>ИЛИ</span></button><button type="button" data-insert="^" title="Исключающее ИЛИ">^ <span>XOR</span></button>
+          </div>
+          <button class="primary" id="submit" type="submit">Построить диаграмму <span>↗</span></button>
+        </form>
+        <div id="error" class="error" role="alert" hidden></div>
+        <div class="examples"><div class="section-label">ПОПРОБУЙТЕ ПРИМЕР</div>
+          <button data-example="A*B + A*!B">Склеивание <span>→</span></button>
+          <button data-example="F(A,B,C,D) = !C*!D">Четыре угла <span>→</span></button>
+          <button data-example="A^B^C">Исключающее ИЛИ <span>→</span></button>
+        </div>
+        <details><summary>Как записывать функцию</summary><p>Переменные: A, B, C, D или любые четыре латинские буквы, в том числе X1, X2. Регистр не важен.</p><p>НЕ: !A, ¬A, ~A или A'. И: A*B, A∧B, AB. ИЛИ: A+B, A∨B. XOR: A^B, A⊕B. Допустимы скобки, 0 и 1.</p><p>Приоритет: НЕ → И → XOR → ИЛИ. Чтобы сохранить неиспользуемые переменные, задайте F(A,B,C,D) = A. Порядок переменных задаёт порядок битов, первая — старший бит.</p></details>
+        <div class="model-note"><span class="status-dot"></span><div><strong id="model-status">Проверка модели…</strong><p>Собственная нейросеть предлагает группы. Точный поиск гарантирует минимальное число термов, затем литералов.</p></div></div>
+      </section>
+      <section class="card output-card" aria-labelledby="output-title" aria-busy="false" id="output">
+        <div class="output-heading"><div><div class="section-label">02 / РЕЗУЛЬТАТ</div><h2 id="output-title">Диаграмма Вейча</h2></div><span class="badge" id="badge">Готово к расчёту</span></div>
+        <div id="empty">Ваша диаграмма появится здесь.</div>
+        <div id="result" hidden>
+          <div id="diagram" class="diagram"></div>
+          <div class="result-footer"><div id="stats"></div><div class="downloads"><button id="svg-download">↓ SVG</button><button id="png-download">↓ PNG</button></div></div>
+          <p id="verification" class="verification"></p>
+          <details><summary>Таблица истинности</summary><div id="truth-table"></div></details>
+        </div>
+      </section>
+    </div>
+    <section id="system-section" hidden>
+      <div class="card">
+        <div class="section-label">МЕТОД МЕТОК</div><h2>Минимизация системы функций</h2>
+        <form id="system-form">
+          <label for="variable-count">Количество логических переменных</label>
+          <select id="variable-count"><option>1</option><option>2</option><option>3</option><option selected>4</option></select>
+          <p class="system-hint">Переменные A, B, C, D; A — старший бит. Введите номера единичных наборов через запятую: 0, 2, 4. Пустая строка — нулевая функция. От 2 до 4 функций.</p>
+          <div id="system-inputs"></div>
+          <div class="system-actions"><button type="button" id="add-function">+ Добавить функцию</button><button type="submit" class="primary" id="system-submit">Минимизировать систему</button></div>
+        </form>
+        <p class="system-hint">Критерий: минимум букв в общей совокупности импликант. Общий терм считается один раз. Затем для каждой функции выбирается минимальное число термов из этой совокупности.</p>
+        <div id="system-error" class="error" role="alert" hidden></div>
+      </div>
+      <div id="system-result" hidden aria-live="polite">
+        <section class="card system-block"><h2>Совместная реализация</h2><p id="system-cost"></p><div id="system-formulas"></div></section>
+        <section class="card system-block"><h2>Импликантная матрица</h2>
+          <p class="system-hint">Столбец: двоичный набор / функция. + — поглощение; √ — обязательная импликанта или покрытый ею столбец; * — дополнительный выбор.</p>
+          <div class="system-actions"><button id="copy-matrix">Скопировать таблицу для Word</button><button id="download-matrix">Скачать HTML-таблицу</button></div>
+          <p id="copy-status" role="status"></p><div id="system-matrix" class="matrix-scroll" tabindex="0" aria-label="Импликантная матрица"></div>
+          <p class="system-hint">В Word вставьте через Ctrl+V с сохранением исходного форматирования. Если редактор не принимает таблицу, откройте скачанный HTML или преобразуйте вставленный текст в таблицу с разделителем «табуляция».</p>
+        </section>
+        <section class="system-block"><h2>Диаграммы итоговых функций</h2><div id="system-output-maps" class="map-grid"></div></section>
+        <section class="system-block"><h2>Все простые импликанты функций и их произведений</h2><p class="system-hint">Сокращённые ДНФ: все простые импликанты, включая не вошедшие в итоговую систему.</p><div id="system-product-maps" class="map-grid"></div></section>
+        <section class="card system-block"><h2>Итоговая система в базисе штриха Шеффера</h2><p class="system-hint">X ↑ Y = ¬(X · Y). Все элементы двухвходовые. T — общие промежуточные сигналы; ниже записаны выходы системы.</p><div id="sheffer-gates"></div><div id="sheffer-outputs" class="equation-system"></div><button id="copy-sheffer">Скопировать систему</button><p id="sheffer-status" role="status"></p></section>
+      </div>
+    </section>
+    <footer>Текстовый ввод · 0–4 переменные · Собственная модель, обученная с нуля</footer>
+  </main>
+</body>
+</html>
