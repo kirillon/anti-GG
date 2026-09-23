@@ -62,6 +62,11 @@ def function_html(name):
     return 'F<sub>' + escape(name[1:]) + '</sub>'
 
 
+def formula_html(groups, variables):
+    """Render the DNF with visible overlines instead of a fragile ¬ glyph."""
+    return ' + '.join(literal_html(group['pattern'], variables) for group in groups) or '0'
+
+
 def matrix_export(columns, rows, covered, variables):
     style = 'border:1px solid #222;padding:5px 8px;white-space:nowrap;text-align:center;font-weight:normal'
     def cell(value, tag='td', attrs=''):
@@ -138,14 +143,18 @@ def solve_system(n, sources):
     covered = ['√' if any(masks[i] >> c & 1 for i in essential) else '*' for c in range(len(columns))]
     outputs = []
     for i, ones in enumerate(functions):
-        available = [j for j in chosen if f'F{i+1}' in rows[j]['labels']]
+        # The joint matrix selects shared rows, but a function may still need
+        # its own prime implicant to combine cells that have different labels
+        # in the other functions (for example 11 and 15 in F1).
+        available = [j for j, row in enumerate(rows) if f'F{i+1}' in row['labels']]
         local = minimum_cover([sum(1 << m for m in rows[j]['cells']) for j in available],
-                              [1] * len(available), ones)
+                              [rows[j]['literals'] for j in available], ones)
         indices = [available[j] for j in local]
         diagram = {'variables': variables, 'truth': [int(ones >> m & 1) for m in range(1 << n)],
                    'groups': [rows[j] for j in indices],
                    'formula': ' + '.join(rows[j]['term'] for j in indices) or '0'}
-        outputs.append({'name': f'F{i+1}', 'row_indices': indices, **diagram,
+        outputs.append({'name': f'F{i+1}', 'row_indices': indices,
+                        'formula_html': formula_html(diagram['groups'], variables), **diagram,
                         'svg': render_svg(diagram, name=f'F{i+1}', formula_label='ДНФ совместной реализации')})
     html, tsv = matrix_export(columns, rows, covered, variables)
     return {'variables': variables, 'products': products, 'columns': columns, 'rows': rows,

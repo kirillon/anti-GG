@@ -8,6 +8,8 @@ import torch
 from veitch.model import GroupModel, MODEL_PATH
 from veitch.service import solve
 from veitch.system import solve_system
+from veitch.timing import netlist, simulate
+from veitch.excel import export_timing
 
 ROOT = Path(__file__).resolve().parent
 
@@ -43,7 +45,7 @@ def handler_for(model):
             self.send_bytes(200, (ROOT / "static" / filename).read_bytes(), mime)
 
         def do_POST(self):
-            if self.path not in ("/api/minimize", "/api/system"):
+            if self.path not in ("/api/minimize", "/api/system", "/api/timing", "/api/timing.xlsx"):
                 self.send_json(404, {"error": "Метод не найден."})
                 return
             if self.headers.get_content_type() != "application/json":
@@ -57,10 +59,24 @@ def handler_for(model):
                 body = json.loads(self.rfile.read(length))
                 if not isinstance(body, dict):
                     raise ValueError("Ожидается объект с полем function.")
-                result = (solve_system(body.get("variables"), body.get("functions"))
-                          if self.path == "/api/system" else solve(body.get("function"), model))
+                if self.path == '/api/minimize':
+                    result = solve(body.get('function'), model)
+                else:
+                    result = solve_system(body.get('variables'), body.get('functions'))
+                    circuit = netlist(result['sheffer'], result['variables'])
+                    timing = simulate(circuit, body.get('period', 12), body.get('t01', 2), body.get('t10', 3))
+                    if self.path == '/api/timing.xlsx':
+                        self.send_bytes(200, export_timing(timing), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                        return
+                    if self.path == '/api/timing':
+                        result = timing
+                    else:
+                        result.update(circuit=circuit, timing=timing)
             except (ValueError, UnicodeError) as error:
                 self.send_json(400, {"error": str(error)})
+                return
+            except RuntimeError as error:
+                self.send_json(503, {'error': str(error)})
                 return
             self.send_json(200, result)
     return Handler

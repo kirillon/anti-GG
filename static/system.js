@@ -62,8 +62,8 @@ $("system-form").addEventListener('submit', async event => {
     if (!response.ok) throw new Error(data.error || 'Ошибка расчёта');
     systemResult = data;
     $("sheffer-gates").replaceChildren(); $("sheffer-outputs").replaceChildren();
-    for (const item of data.sheffer.gates) {
-      const p = document.createElement('p'); p.textContent = `${item.name} = ${item.expression}`; $('sheffer-gates').append(p);
+    for (const item of data.circuit.gates) {
+      const p = document.createElement('p'); p.textContent = `${item.name} = ${item.kind}(${item.inputs.join(', ')})`; $('sheffer-gates').append(p);
     }
     for (const item of data.sheffer.outputs) {
       const p = document.createElement('p');
@@ -72,13 +72,21 @@ $("system-form").addEventListener('submit', async event => {
       // Formula markup is generated from validated variable names and escaped on the server.
       formula.innerHTML = item.formula_html; p.append(formula); $('sheffer-outputs').append(p);
     }
-    $('sheffer-diagram').innerHTML = data.sheffer.svg;
+    $('sheffer-diagram').innerHTML = data.circuit.svg;
+    timingSource = {variables:Number($('variable-count').value), functions:[...$('system-inputs').querySelectorAll('input')].map(input=>input.value)};
+    $('timing-period').value='12'; $('timing-t01').value='2'; $('timing-t10').value='3';
+    await showTiming(data.timing, id);
+    if(id !== systemRequest) return;
     $('sheffer-zoom').value = '100'; resizeCircuit();
     $("sheffer-status").textContent = '';
     $("system-cost").textContent = `Букв в общей совокупности: ${data.literal_count}. Общих термов: ${data.term_count}. Минимум найден точным методом меток.`;
     $("system-formulas").replaceChildren();
     for (const output of data.outputs) {
-      const p = document.createElement('p'); p.textContent = `${output.name} = ${output.formula}`;
+      const p = document.createElement('p');
+      p.append(document.createTextNode(`${output.name} = `));
+      const formula = document.createElement('span');
+      formula.innerHTML = output.formula_html || output.formula;
+      p.append(formula);
       $("system-formulas").append(p);
     }
     $("system-matrix").innerHTML = data.matrix_html;
@@ -97,12 +105,12 @@ function resizeCircuit() {
 }
 $('sheffer-zoom').addEventListener('input', resizeCircuit);
 $('sheffer-svg').addEventListener('click', () => {
-  if (systemResult) download(new Blob([systemResult.sheffer.svg], {type:'image/svg+xml;charset=utf-8'}), 'sheffer-system.svg');
+  if (systemResult) download(new Blob([systemResult.circuit.svg], {type:'image/svg+xml;charset=utf-8'}), 'sheffer-system.svg');
 });
 $('sheffer-png').addEventListener('click', async () => {
   if (!systemResult) return;
   const button = $('sheffer-png'); button.disabled = true;
-  const url = URL.createObjectURL(new Blob([systemResult.sheffer.svg], {type:'image/svg+xml;charset=utf-8'}));
+  const url = URL.createObjectURL(new Blob([systemResult.circuit.svg], {type:'image/svg+xml;charset=utf-8'}));
   try {
     const img = new Image(); img.src = url; await img.decode();
     const canvas = document.createElement('canvas');
@@ -145,4 +153,53 @@ $("copy-sheffer").addEventListener('click', async () => {
   if (!systemResult) return;
   try {await navigator.clipboard.writeText(systemResult.sheffer.text); $("sheffer-status").textContent='Система скопирована.';}
   catch {$("sheffer-status").textContent='Выделите формулы и скопируйте через Ctrl+C.';}
+});
+
+let timingData=null, timingBlob=null, timingUrl=null, timingSource=null, timingRevision=0;
+function timingParameters() {
+  return {...timingSource, period:Number($('timing-period').value), t01:Number($('timing-t01').value), t10:Number($('timing-t10').value)};
+}
+async function showTiming(data, request, revision=timingRevision) {
+  const url=URL.createObjectURL(new Blob([data.svg],{type:'image/svg+xml'}));
+  try {
+    const image=new Image(); image.src=url; await image.decode();
+    const canvas=document.createElement('canvas'); canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+    canvas.getContext('2d').drawImage(image,0,0);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    if(request!==systemRequest || revision!==timingRevision) return;
+    if(!blob) throw new Error('Не удалось построить изображение временной диаграммы.');
+    if(timingUrl) URL.revokeObjectURL(timingUrl);
+    timingData=data;timingBlob=blob;timingUrl=URL.createObjectURL(blob);
+    $('timing-image').src=timingUrl; $('timing-image').hidden=false;
+    $('timing-excel').disabled=false;$('timing-png').disabled=false;
+    $('timing-status').textContent='Сигналы рассчитаны по соединениям схемы. Excel содержит редактируемые формулы и задержки.';
+  } finally {URL.revokeObjectURL(url);}
+}
+for(const id of ['timing-period','timing-t01','timing-t10']) $(id).addEventListener('input',()=>{
+  timingRevision++;timingData=null;timingBlob=null;$('timing-image').hidden=true;
+  $('timing-excel').disabled=true;$('timing-png').disabled=true;
+  $('timing-status').textContent='Параметры изменены. Нажмите «Пересчитать».';
+});
+$('timing-update').addEventListener('click',async()=>{
+  if(!systemResult) return;
+  const request=systemRequest, revision=++timingRevision;
+  try {
+    const response=await fetch('/api/timing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(timingParameters())});
+    const data=await response.json(); if(request!==systemRequest||revision!==timingRevision)return;
+    if(!response.ok)throw new Error(data.error);
+    await showTiming(data,request,revision);
+  } catch(error){if(request===systemRequest && revision===timingRevision)$('timing-status').textContent=error.message;}
+});
+$('timing-png').addEventListener('click',()=>{if(timingBlob)download(timingBlob,'timing.png');});
+$('timing-excel').addEventListener('click',async()=>{
+  if(!timingData||!systemResult)return;
+  const request=systemRequest, revision=timingRevision, button=$('timing-excel');button.disabled=true;
+  $('timing-status').textContent='Создаётся Excel с формулами…';
+  try {
+    const response=await fetch('/api/timing.xlsx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(timingParameters())});
+    if(!response.ok)throw new Error((await response.json()).error);
+    const blob=await response.blob();if(request!==systemRequest||revision!==timingRevision)return;
+    download(blob,'timing.xlsx');$('timing-status').textContent='Excel готов. Задержки и формулы доступны на листе «Расчёт».';
+  }catch(error){if(request===systemRequest && revision===timingRevision)$('timing-status').textContent=error.message;}
+  finally {button.disabled=!timingData;}
 });

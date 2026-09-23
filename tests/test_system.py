@@ -6,6 +6,31 @@ from veitch.system import solve_system, parse_sets
 
 
 class SystemTests(unittest.TestCase):
+    def test_four_variable_case_from_user_has_minimal_cover(self):
+        result = solve_system(4, [
+            '0,2,4,6,8,11,13,15',
+            '0,2,4,6,8,11,13',
+            '0,2,4,6,13,15',
+        ])
+        # Regression: every output must be covered exactly by the selected
+        # implicants, and the joint cover must contain no redundant row.
+        for output in result['outputs']:
+            covered = set()
+            for group in output['groups']:
+                covered.update(group['cells'])
+            expected = set(result['columns'][i]['minterm']
+                           for i, column in enumerate(result['columns'])
+                           if column['function'] == output['name'])
+            self.assertEqual(covered, expected)
+        for index in result['selected']:
+            reduced = [i for i in result['selected'] if i != index]
+            self.assertFalse(all(
+                any(result['rows'][j]['coverage'][column] for j in reduced)
+                for column in range(len(result['columns']))
+            ))
+        f1_patterns = {tuple(g['pattern']) for g in result['outputs'][0]['groups']}
+        self.assertIn((1, -1, 1, 1), f1_patterns)  # cells 11 and 15
+        self.assertNotIn((1, 0, 1, 1), f1_patterns)  # singleton 11 is absorbed
     def verify(self, result, functions):
         circuit = result['sheffer']
         for assignment in range(1 << len(result['variables'])):

@@ -108,6 +108,22 @@ try {
   await evaluate(`document.getElementById('system-form').requestSubmit()`);
   await waitFor(`!document.getElementById('system-result').hidden`);
   assert.match(await evaluate(`document.getElementById('system-cost').textContent`), /13/);
+  await waitFor(`document.getElementById('timing-image').naturalWidth > 0`);
+  await evaluate(`document.getElementById('timing-excel').click(); document.getElementById('timing-png').click()`);
+  for (let i=0; i<600; i++) {
+    const files=await readdir(downloads);
+    if(files.includes('timing.xlsx') && files.includes('timing.png'))break;
+    await sleep(100);
+  }
+  assert.equal((await readFile(join(downloads,'timing.xlsx'))).subarray(0,2).toString(),'PK');
+  assert.equal((await readFile(join(downloads,'timing.png'))).subarray(1,4).toString(),'PNG');
+  await writeFile(join(artifacts,'timing.png'),await readFile(join(downloads,'timing.png')));
+  await evaluate(`document.getElementById('timing-t01').value='0'; document.getElementById('timing-t01').dispatchEvent(new Event('input'));`);
+  assert.equal(await evaluate(`document.getElementById('timing-image').hidden`),true);
+  await evaluate(`document.getElementById('timing-update').click()`);
+  await waitFor(`!document.getElementById('timing-image').hidden && document.getElementById('timing-image').naturalWidth > 0`);
+  assert.equal(await evaluate(`timingData.t01`),0);
+
   assert.equal(await evaluate(`document.querySelectorAll('#system-product-maps svg').length`), 7);
   assert.equal(await evaluate(`document.querySelectorAll('#system-output-maps svg').length`), 3);
   assert.equal(await evaluate(`document.querySelectorAll('#system-matrix tr').length`), 14);
